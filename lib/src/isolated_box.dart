@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
 
 part 'isolated_box_worker.dart';
 
@@ -28,10 +29,10 @@ class IsolatedBox<T> {
   });
 
   static Future<IsolatedBox<T>> init<T>({
-    required String dirPath,
     required String boxName,
-    required FromJson<T> fromJson,
-    required ToJson<T> toJson,
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    String? dirPath,
   }) async {
     final box = IsolatedBox<T>._(
       boxName,
@@ -42,17 +43,19 @@ class IsolatedBox<T> {
   }
 
   final String boxName;
-  final FromJson<T> fromJson;
-  final ToJson<T> toJson;
+  final FromJson<T>? fromJson;
+  final ToJson<T>? toJson;
   Isolate? _isolate;
   SendPort? _sendPort;
 
-  Future<IsolatedBox<T>> _init({required String dirPath}) async {
+  Future<IsolatedBox<T>> _init({required String? dirPath}) async {
     final sendPort = IsolateNameServer.lookupPortByName(boxName);
     if (await _isIsolateResponsive(sendPort)) {
       _sendPort = sendPort;
       return this;
     }
+
+    dirPath ??= (await getApplicationDocumentsDirectory()).path;
 
     final receivePort = ReceivePort();
     _isolate = await Isolate.spawn(
@@ -93,15 +96,15 @@ class IsolatedBox<T> {
     final response = ReceivePort();
 
     Uint8List objectToBytes(T object) {
-      final mapObject = toJson(object);
+      final mapObject = toJson?.call(object) ?? object;
       final jsonString = jsonEncode(mapObject);
       return Uint8List.fromList(utf8.encode(jsonString));
     }
 
     T objectFromBytes(Uint8List bytes) {
       final jsonString = utf8.decode(bytes);
-      final mapObject = jsonDecode(jsonString) as Map<String, Object?>;
-      return fromJson(mapObject);
+      final mapObject = jsonDecode(jsonString);
+      return fromJson?.call(mapObject) ?? mapObject as T;
     }
 
     final formatedInput = () {
