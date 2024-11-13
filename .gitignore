@@ -33,3 +33,5 @@ build/
 .flutter-plugins
 
 files.hive
+
+box.hive

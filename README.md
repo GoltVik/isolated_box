@@ -1,39 +1,44 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# Isolated Box
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+Isolated Box for Hive project.
+Main goal of this project is to provide an isolated environment for Hive boxes and make collections 
+cross-isolated without loosing Hive functions. 
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- Provides an isolated environment for Hive boxes.
+- Supports asynchronous operations for better performance.
+- Includes various methods for CRUD operations on Hive boxes.
+
+## TODO
+
+- Fix primitive data types serialization.
+- Add data migration support.
+- Add support for box event streaming. 
 
 ## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+### Installation
 
-## Usage
+Add the following dependencies to your `pubspec.yaml` file:
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
-```dart
-const like = 'sample';
+```yaml
+dependencies:
+  isolated_box: ^0.0.1
 ```
 
-## Additional information
+Run flutter pub get to install the dependencies.
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+### Usage
+
+Initializing the Isolated Box:
+
+```dart
+import 'package:isolated_box/isolated_box.dart';
+
+void main() async {
+  final isolatedBox = IsolatedBox.init(
+    
+  );
+}
+````
