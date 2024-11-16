@@ -12,7 +12,6 @@ cross-isolated without loosing Hive functions.
 
 ## TODO
 
-- Fix primitive data types serialization.
 - Add data migration support.
 - Add support for box event streaming. 
 
@@ -24,7 +23,7 @@ Add the following dependencies to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  isolated_box: ^0.0.1
+  isolated_box: ^0.0.2
 ```
 
 Run flutter pub get to install the dependencies.
