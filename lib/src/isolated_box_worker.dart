@@ -1,5 +1,23 @@
 part of 'isolated_box.dart';
 
+class _ActionModel {
+  final String action;
+  final dynamic data;
+  final SendPort responsePort;
+
+  //data as null
+  //data as int
+  //data as dynamic (key)
+  //data as MapEntry<String,Uint8List>
+  //data as MapEntry<int, Uint8List>
+  //data as Map<dynamic, Uint8List>
+  //data as Uint8List
+  //data as List<Uint8List>
+  //data as Iterable<dynamic> (keys)
+
+  _ActionModel(this.action, this.data, this.responsePort);
+}
+
 Future<void> _collectionIsolate<T>(List<dynamic> args) async {
   final mainSendPort = args[0] as SendPort;
   final boxName = args[1] as String;
@@ -18,125 +36,126 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
   final receivePort = ReceivePort();
   mainSendPort.send(receivePort.sendPort);
 
-  await for (final message in receivePort) {
-    final portInput = message as List;
-    final data = portInput[0] as Map<Object, Object?>;
-    final responsePort = portInput[1] as SendPort;
+  await for (final model in receivePort) {
+    if (model is! _ActionModel) {
+      throw ArgumentError('Invalid model type: ${model.runtimeType}');
+    }
+
+    final data = model.data;
 
     try {
-      switch (data['action']) {
+      switch (model.action) {
         case _Functions.preOpen:
           if (box.length > 0) box.getAt(0);
-          responsePort.send(true);
+          model.responsePort.send(true);
 
         case _Functions.name:
-          responsePort.send(box.name);
+          model.responsePort.send(box.name);
 
         case _Functions.isOpen:
-          responsePort.send(box.isOpen);
+          model.responsePort.send(box.isOpen);
 
         case _Functions.path:
-          responsePort.send(box.path);
+          model.responsePort.send(box.path);
 
         case _Functions.keys:
-          final keys = box.keys.map((key) => key.toString()).toList();
-          responsePort.send(keys);
+          final keys = box.keys.toList();
+          model.responsePort.send(keys);
 
         case _Functions.length:
-          responsePort.send(box.length);
+          model.responsePort.send(box.length);
 
         case _Functions.keyAt:
-          final index = data['index']! as int;
+          final index = data as int;
           try {
             final key = box.keyAt(index);
-            responsePort.send(key);
+            model.responsePort.send(key);
           } catch (e) {
-            responsePort.send(null);
+            model.responsePort.send(null);
           }
 
         case _Functions.containsKey:
-          final key = data['key'];
+          final key = data;
           final contains = box.containsKey(key);
-          responsePort.send(contains);
+          model.responsePort.send(contains);
 
         case _Functions.put:
-          final key = data['key']! as String;
-          final value = data['value']! as Uint8List;
-          await box.put(key, value);
-          responsePort.send(true);
+          final entry = data as MapEntry<dynamic, Uint8List>;
+          await box.put(entry.key, entry.value);
+          model.responsePort.send(true);
 
         case _Functions.putAt:
-          final key = data['index']! as int;
-          final value = data['value']! as Uint8List;
-          await box.putAt(key, value);
-          responsePort.send(true);
+          final entry = data as MapEntry<int, Uint8List>;
+          await box.putAt(entry.key, entry.value);
+          model.responsePort.send(true);
 
         case _Functions.putAll:
-          final values = data['entries']! as Map<String, Uint8List>;
+          final values = data as Map<dynamic, Uint8List>;
           await box.putAll(values);
-          responsePort.send(true);
+          model.responsePort.send(true);
 
         case _Functions.add:
-          final input = data['value']! as Uint8List;
+          final input = data as Uint8List;
           final key = await box.add(input);
-          responsePort.send(key);
+          model.responsePort.send(key);
 
         case _Functions.addAll:
-          final input = data['values']! as List<Uint8List>;
+          final input = data.cast<Uint8List>();
           final keys = await box.addAll(input);
-          responsePort.send(keys.toList());
+          model.responsePort.send(keys.toList());
 
         case _Functions.delete:
-          final key = data['key']! as String;
+          final key = data;
           await box.delete(key);
-          responsePort.send(true);
+          model.responsePort.send(true);
 
         case _Functions.deleteAt:
-          final index = data['index']! as int;
+          final index = data as int;
           await box.deleteAt(index);
-          responsePort.send(true);
+          model.responsePort.send(true);
 
         case _Functions.deleteAll:
-          final keys = data['keys']! as Iterable<dynamic>;
+          final keys = data as Iterable<dynamic>;
           await box.deleteAll(keys);
-          responsePort.send(true);
+          model.responsePort.send(true);
 
         case _Functions.get:
-          final key = data['key']! as String;
+          final key = data;
           final result = box.get(key);
-          responsePort.send(result);
+          model.responsePort.send(result);
 
         case _Functions.getAt:
-          final index = data['index']! as int;
+          final index = data as int;
           final result = box.getAt(index);
-          responsePort.send(result);
+          model.responsePort.send(result);
 
         case _Functions.getAll:
           final values = box.values.toList();
-          responsePort.send(values);
+          model.responsePort.send(values);
 
         case _Functions.clear:
           await box.clear();
-          responsePort.send(true);
-
-        case _Functions.deleteFromDisk:
-          await box.deleteFromDisk();
-          responsePort.send(true);
+          model.responsePort.send(true);
 
         case _Functions.flush:
           await box.flush();
-          responsePort.send(true);
+          model.responsePort.send(true);
 
         case _Functions.dispose:
           await box.close();
-          responsePort.send(true);
+          model.responsePort.send(true);
+          receivePort.close();
+
+        case _Functions.deleteFromDisk:
+          await box.deleteFromDisk();
+          model.responsePort.send(true);
           receivePort.close();
 
         default:
           throw UnsupportedError("Unsupported action: ${data['action']}");
       }
     } catch (e) {
-      responsePort.send('e: $e');
+      model.responsePort.send('e: $e');
     }
   }
 }

@@ -1,20 +1,22 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isolated_box/isolated_box.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'test_model.dart';
 
 void main() {
   IsolatedBox<TestModel>? isolatedBox;
 
-  TestModel mockModel() => TestModel(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+  TestModel mockModel([int? index]) => TestModel(
+        id: index?.toString() ??
+            DateTime.now().microsecondsSinceEpoch.toString(),
         updatedAt: DateTime.now(),
       );
 
-  setUpAll(() async {
+  Future<void> initBox() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     WidgetsFlutterBinding.ensureInitialized();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -23,15 +25,15 @@ void main() {
       (MethodCall methodCall) async => '.',
     );
 
-    final appDir = await getApplicationDocumentsDirectory();
     isolatedBox = await IsolatedBox.init<TestModel>(
-      dirPath: appDir.path,
       boxName: 'files',
       fromJson: TestModel.fromJson,
       toJson: TestModel.toJsonString,
     );
     await isolatedBox?.clear();
-  });
+  }
+
+  setUpAll(() async => await initBox());
 
   tearDown(() async {
     try {
@@ -39,7 +41,12 @@ void main() {
     } catch (_) {}
   });
 
-  tearDownAll(() async => await isolatedBox?.dispose());
+  tearDownAll(() async {
+    try {
+      await isolatedBox?.dispose();
+      await isolatedBox?.deleteFromDisk();
+    } catch (_) {}
+  });
 
   test('name', () async {
     final name = await isolatedBox?.name;
@@ -56,7 +63,7 @@ void main() {
     var count = await isolatedBox?.length;
     expect(count, 0);
 
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     await isolatedBox?.addAll(items);
 
     count = await isolatedBox?.length;
@@ -92,7 +99,7 @@ void main() {
     final key = await isolatedBox?.keyAt(0);
     expect(key, isNull);
 
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     final ids = items.map((e) => e.id);
     await isolatedBox?.putAll({for (var e in items) e.id: e});
 
@@ -136,7 +143,7 @@ void main() {
     var keys = await isolatedBox?.keys;
     expect(keys?.length, 0);
 
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     final ids = items.map((e) => e.id);
     await isolatedBox?.putAll({for (var e in items) e.id: e});
 
@@ -165,7 +172,7 @@ void main() {
   });
 
   test('addAll', () async {
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     final ids = await isolatedBox?.addAll(items);
 
     expect(ids, isA<List<int>>());
@@ -214,7 +221,7 @@ void main() {
   });
 
   test('putAll', () async {
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     await isolatedBox?.putAll({for (var e in items) e.id: e});
 
     final materialFromBox = await isolatedBox?.getAll();
@@ -265,7 +272,7 @@ void main() {
   });
 
   test('getAll when prefilled', () async {
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     await isolatedBox?.addAll(items);
 
     final result = await isolatedBox?.getAll();
@@ -348,7 +355,7 @@ void main() {
   });
 
   test('deleteAll when keys are existing in db', () async {
-    final data = List.generate(3, (index) => mockModel());
+    final data = List.generate(3, mockModel);
     final ids = data.map((e) => e.id);
     await isolatedBox?.putAll({for (final e in data) e.id: e});
 
@@ -374,7 +381,7 @@ void main() {
   });
 
   test('clear when is not empty', () async {
-    final data = List.generate(3, (index) => mockModel());
+    final data = List.generate(3, mockModel);
     final newIds = await isolatedBox?.addAll(data);
     expect(newIds?.length, data.length);
 
@@ -396,6 +403,21 @@ void main() {
 
   test('dispose', () async {
     await isolatedBox?.dispose();
+    try {
+      await isolatedBox?.getAll();
+    } catch (e) {
+      expect(e, isA<AssertionError>());
+    }
+  });
+
+  test('deleteBox', () async {
+    await initBox();
+
+    final path = await isolatedBox?.path;
+    await isolatedBox?.deleteFromDisk();
+    final exists = File(path!).existsSync();
+    expect(exists, false);
+
     try {
       await isolatedBox?.getAll();
     } catch (e) {

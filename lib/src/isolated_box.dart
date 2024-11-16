@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
 
 part 'isolated_box_worker.dart';
 
@@ -28,10 +29,10 @@ class IsolatedBox<T> {
   });
 
   static Future<IsolatedBox<T>> init<T>({
-    required String dirPath,
     required String boxName,
-    required FromJson<T> fromJson,
-    required ToJson<T> toJson,
+    FromJson<T>? fromJson,
+    ToJson<T>? toJson,
+    String? dirPath,
   }) async {
     final box = IsolatedBox<T>._(
       boxName,
@@ -42,17 +43,19 @@ class IsolatedBox<T> {
   }
 
   final String boxName;
-  final FromJson<T> fromJson;
-  final ToJson<T> toJson;
+  final FromJson<T>? fromJson;
+  final ToJson<T>? toJson;
   Isolate? _isolate;
   SendPort? _sendPort;
 
-  Future<IsolatedBox<T>> _init({required String dirPath}) async {
+  Future<IsolatedBox<T>> _init({required String? dirPath}) async {
     final sendPort = IsolateNameServer.lookupPortByName(boxName);
     if (await _isIsolateResponsive(sendPort)) {
       _sendPort = sendPort;
       return this;
     }
+
+    dirPath ??= (await getApplicationDocumentsDirectory()).path;
 
     final receivePort = ReceivePort();
     _isolate = await Isolate.spawn(
@@ -90,57 +93,49 @@ class IsolatedBox<T> {
   }
 
   Future<E> _makeIsolateCall<E>(String action, [dynamic input]) async {
-    final response = ReceivePort();
-
     Uint8List objectToBytes(T object) {
-      final mapObject = toJson(object);
+      final mapObject = toJson?.call(object) ?? object;
       final jsonString = jsonEncode(mapObject);
       return Uint8List.fromList(utf8.encode(jsonString));
     }
 
     T objectFromBytes(Uint8List bytes) {
       final jsonString = utf8.decode(bytes);
-      final mapObject = jsonDecode(jsonString) as Map<String, Object?>;
-      return fromJson(mapObject);
+      final mapObject = jsonDecode(jsonString);
+      return fromJson?.call(mapObject) ?? mapObject as T;
     }
 
     final formatedInput = () {
-      if (input == null) return null;
-      if (input is Map<int, T>) {
+      if (input is MapEntry<int, T>) {
+        return MapEntry(input.key, objectToBytes(input.value));
+      }
+      if (input is MapEntry<String, T>) {
+        return MapEntry(input.key, objectToBytes(input.value));
+      }
+      if (input is MapEntry<dynamic, T>) {
+        return MapEntry(input.key, objectToBytes(input.value));
+      }
+      if (input is Iterable<T> || input is List<T>) {
+        return input.map(objectToBytes).toList();
+      }
+      if (input is Map<dynamic, T>) {
         return input.map((key, value) => MapEntry(key, objectToBytes(value)));
       }
-      if (input is Map<String, Map<String, T>>) {
-        return input.map(
-          (key, value) => MapEntry(
-            key,
-            value.map((key, value) => MapEntry(key, objectToBytes(value))),
-          ),
-        );
+      if (input is T && action == _Functions.add) {
+        return objectToBytes(input);
       }
-      if (input is Map<String, Iterable<T>>) {
-        return input.map(
-          (key, value) => MapEntry(key, value.map(objectToBytes).toList()),
-        );
-      }
-      if (input is Map<String, Object?>) {
-        return input.map((key, value) {
-          return MapEntry(key, value is T ? objectToBytes(value) : value);
-        });
-      }
-      return input as Map<String, Object?>;
+      return input;
     }();
 
-    _sendPort!.send([
-      {'action': action, if (formatedInput != null) ...formatedInput},
-      response.sendPort,
-    ]);
+    final response = ReceivePort();
+    _sendPort!.send(_ActionModel(action, formatedInput, response.sendPort));
 
     final result = await response.first;
+    response.close();
 
     if (result.toString().startsWith('e:')) {
       throw Exception(result.toString().substring(3));
     }
-    response.close();
 
     final parsedResult = () {
       if (result is List<Uint8List>) {
@@ -235,9 +230,7 @@ class IsolatedBox<T> {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      final key = await _makeIsolateCall<dynamic>(_Functions.keyAt, {
-        'index': index,
-      });
+      final key = await _makeIsolateCall<dynamic>(_Functions.keyAt, index);
       return key;
     } catch (e) {
       throw IsolatedBoxException(e.toString());
@@ -248,23 +241,18 @@ class IsolatedBox<T> {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      final result = await _makeIsolateCall<bool>(_Functions.containsKey, {
-        'key': key,
-      });
+      final result = await _makeIsolateCall<bool>(_Functions.containsKey, key);
       return result;
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
   }
 
-  Future<void> put(String key, T value) async {
+  Future<void> put(dynamic key, T value) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      await _makeIsolateCall<void>(_Functions.put, {
-        'key': key,
-        'value': value,
-      });
+      await _makeIsolateCall<void>(_Functions.put, MapEntry(key, value));
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
@@ -274,22 +262,17 @@ class IsolatedBox<T> {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      await _makeIsolateCall<void>(_Functions.putAt, {
-        'index': index,
-        'value': value,
-      });
+      await _makeIsolateCall<void>(_Functions.putAt, MapEntry(index, value));
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
   }
 
-  Future<void> putAll(Map<String, T> entries) async {
+  Future<void> putAll(Map<dynamic, T> entries) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      await _makeIsolateCall<void>(_Functions.putAll, {
-        'entries': entries,
-      });
+      await _makeIsolateCall<void>(_Functions.putAll, entries);
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
@@ -299,9 +282,7 @@ class IsolatedBox<T> {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      final index = await _makeIsolateCall<int>(_Functions.add, {
-        'value': value,
-      });
+      final index = await _makeIsolateCall<int>(_Functions.add, value);
       return index;
     } catch (e) {
       throw IsolatedBoxException(e.toString());
@@ -314,7 +295,7 @@ class IsolatedBox<T> {
     try {
       final keys = await _makeIsolateCall<List<dynamic>>(
         _Functions.addAll,
-        {'values': values},
+        values,
       );
       return keys;
     } catch (e) {
@@ -326,7 +307,7 @@ class IsolatedBox<T> {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      await _makeIsolateCall<void>(_Functions.delete, {'key': key});
+      await _makeIsolateCall<void>(_Functions.delete, key);
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
@@ -336,7 +317,7 @@ class IsolatedBox<T> {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      await _makeIsolateCall<void>(_Functions.deleteAt, {'index': index});
+      await _makeIsolateCall<void>(_Functions.deleteAt, index);
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
@@ -346,17 +327,17 @@ class IsolatedBox<T> {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      await _makeIsolateCall<void>(_Functions.deleteAll, {'keys': keys});
+      await _makeIsolateCall<void>(_Functions.deleteAll, keys.cast<dynamic>());
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
   }
 
-  Future<T?> get(String key, {T? defaultValue}) async {
+  Future<T?> get(dynamic key, {T? defaultValue}) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      final value = await _makeIsolateCall<T?>(_Functions.get, {'key': key});
+      final value = await _makeIsolateCall<T?>(_Functions.get, key);
       return value ?? defaultValue;
     } catch (e) {
       throw IsolatedBoxException(e.toString());
@@ -367,8 +348,7 @@ class IsolatedBox<T> {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
-      final value =
-          await _makeIsolateCall<T?>(_Functions.getAt, {'index': index});
+      final value = await _makeIsolateCall<T?>(_Functions.getAt, index);
       return value ?? defaultValue;
     } catch (e) {
       throw IsolatedBoxException(e.toString());
@@ -396,21 +376,23 @@ class IsolatedBox<T> {
     }
   }
 
-  Future<void> deleteFromDisk() async {
-    assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
-
-    try {
-      await _makeIsolateCall<void>(_Functions.deleteFromDisk);
-    } catch (e) {
-      throw IsolatedBoxException(e.toString());
-    }
-  }
-
   Future<void> flush() async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     try {
       await _makeIsolateCall<void>(_Functions.flush);
+    } catch (e) {
+      throw IsolatedBoxException(e.toString());
+    }
+  }
+
+  Future<void> deleteFromDisk() async {
+    assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
+
+    try {
+      await _makeIsolateCall<void>(_Functions.deleteFromDisk);
+      _sendPort = null;
+      await dispose();
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
