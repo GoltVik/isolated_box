@@ -144,7 +144,7 @@ void main() {
 
     final items = List.generate(3, mockModel);
     final ids = items.map((e) => e.id);
-    await isolatedBox?.putAll({for (var e in items) e.id: e});
+    await isolatedBox?.putAll({for (final e in items) e.id: e});
 
     keys = await isolatedBox?.keys;
     expect(keys?.length, 3);
@@ -235,7 +235,7 @@ void main() {
   });
 
   test('get null when key is not found', () async {
-    final key = '1';
+    const key = '1';
     final result = await isolatedBox?.get(key);
     expect(result, isNull);
   });
@@ -334,7 +334,7 @@ void main() {
     final index = await isolatedBox?.add(item);
     final key = await isolatedBox?.keyAt(index!);
 
-    var exists = await isolatedBox?.containsKey(key!);
+    var exists = await isolatedBox?.containsKey(key);
     expect(exists, true);
 
     await isolatedBox?.deleteAt(index!);
