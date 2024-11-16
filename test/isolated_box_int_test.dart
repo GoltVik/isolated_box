@@ -5,16 +5,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isolated_box/isolated_box.dart';
 
-import 'test_model.dart';
-
 void main() {
-  IsolatedBox<TestModel>? isolatedBox;
+  IsolatedBox<int>? isolatedBox;
 
-  TestModel mockModel([int? index]) => TestModel(
-        id: index?.toString() ??
-            DateTime.now().microsecondsSinceEpoch.toString(),
-        updatedAt: DateTime.now(),
-      );
+  int mockModel([int? index]) => index ?? 0;
 
   Future<void> initBox() async {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -25,11 +19,7 @@ void main() {
       (MethodCall methodCall) async => '.',
     );
 
-    isolatedBox = await IsolatedBox.init<TestModel>(
-      boxName: 'files',
-      fromJson: TestModel.fromJson,
-      toJson: TestModel.toJsonString,
-    );
+    isolatedBox = await IsolatedBox.init<int>(boxName: 'ints');
     await isolatedBox?.clear();
   }
 
@@ -42,21 +32,19 @@ void main() {
   });
 
   tearDownAll(() async {
-    try {
-      await isolatedBox?.dispose();
-      await isolatedBox?.deleteFromDisk();
-    } catch (_) {}
+    await isolatedBox?.dispose();
+    await isolatedBox?.deleteFromDisk();
   });
 
   test('name', () async {
     final name = await isolatedBox?.name;
-    expect(name, 'files');
+    expect(name, 'ints');
   });
 
   test('path', () async {
     final path = await isolatedBox?.path;
     expect(path, isNotNull);
-    expect(path, './files.hive');
+    expect(path, './ints.hive');
   });
 
   test('length', () async {
@@ -100,8 +88,8 @@ void main() {
     expect(key, isNull);
 
     final items = List.generate(3, mockModel);
-    final ids = items.map((e) => e.id);
-    await isolatedBox?.putAll({for (var e in items) e.id: e});
+    final ids = items;
+    await isolatedBox?.putAll({for (var e in items) e: e});
 
     final keyAt0 = await isolatedBox?.keyAt(0);
     expect(keyAt0, isNotNull);
@@ -132,11 +120,11 @@ void main() {
 
   test('keyAt when index is defined', () async {
     final item = mockModel();
-    await isolatedBox?.put(item.id, item);
+    await isolatedBox?.put(item, item);
 
     final result = await isolatedBox?.keyAt(0);
     expect(result, isNotNull);
-    expect(result, item.id);
+    expect(result, item);
   });
 
   test('keys', () async {
@@ -144,8 +132,8 @@ void main() {
     expect(keys?.length, 0);
 
     final items = List.generate(3, mockModel);
-    final ids = items.map((e) => e.id);
-    await isolatedBox?.putAll({for (var e in items) e.id: e});
+    final ids = items;
+    await isolatedBox?.putAll({for (var e in items) e: e});
 
     keys = await isolatedBox?.keys;
     expect(keys?.length, 3);
@@ -155,7 +143,7 @@ void main() {
   test('getAll', () async {
     final materialFromBox = await isolatedBox?.getAll();
 
-    expect(materialFromBox, isA<List<TestModel>>());
+    expect(materialFromBox, isA<List<int>>());
     expect(materialFromBox, isEmpty);
   });
 
@@ -166,7 +154,7 @@ void main() {
 
     final materialFromBox = await isolatedBox?.getAll();
 
-    expect(materialFromBox, isA<List<TestModel>>());
+    expect(materialFromBox, isA<List<int>>());
     expect(materialFromBox, isNotEmpty);
     expect(materialFromBox?.length, 1);
   });
@@ -179,21 +167,21 @@ void main() {
 
     final materialFromBox = await isolatedBox?.getAll();
 
-    expect(materialFromBox, isA<List<TestModel>>());
+    expect(materialFromBox, isA<List<int>>());
     expect(materialFromBox, isNotEmpty);
     expect(materialFromBox?.length, 3);
   });
 
   test('put', () async {
     final material = mockModel();
-    await isolatedBox?.put(material.id, material);
+    await isolatedBox?.put(material, material);
     final materialFromBox = await isolatedBox?.getAll();
 
-    expect(materialFromBox, isA<List<TestModel>>());
+    expect(materialFromBox, isA<List<int>>());
     expect(materialFromBox, isNotEmpty);
     expect(materialFromBox?.length, 1);
 
-    expect(materialFromBox?[0].id, material.id);
+    expect(materialFromBox?[0], material);
   });
 
   test('putAt when is empty ', () async {
@@ -211,28 +199,28 @@ void main() {
 
     var materialFromBox = await isolatedBox?.getAt(index!);
     expect(materialFromBox, isNotNull);
-    expect(materialFromBox?.id, material.id);
+    expect(materialFromBox, material);
 
-    await isolatedBox?.putAt(0, material.copyWith(id: '1'));
+    await isolatedBox?.putAt(0, 1);
 
     materialFromBox = await isolatedBox?.getAt(0);
     expect(materialFromBox, isNotNull);
-    expect(materialFromBox?.id, '1');
+    expect(materialFromBox, 1);
   });
 
   test('putAll', () async {
     final items = List.generate(3, mockModel);
-    await isolatedBox?.putAll({for (var e in items) e.id: e});
+    await isolatedBox?.putAll({for (var e in items) e: e});
 
     final materialFromBox = await isolatedBox?.getAll();
 
-    expect(materialFromBox, isA<List<TestModel>>());
+    expect(materialFromBox, isA<List<int>>());
     expect(materialFromBox, isNotEmpty);
     expect(materialFromBox?.length, 3);
 
-    expect(materialFromBox?[0].id, items[0].id);
-    expect(materialFromBox?[1].id, items[1].id);
-    expect(materialFromBox?[2].id, items[2].id);
+    expect(materialFromBox?[0], items[0]);
+    expect(materialFromBox?[1], items[1]);
+    expect(materialFromBox?[2], items[2]);
   });
 
   test('get null when key is not found', () async {
@@ -242,9 +230,9 @@ void main() {
   });
 
   test('get defaultValue when key is not found', () async {
-    final defaultValue = mockModel();
+    final defaultValue = 2;
     final result = await isolatedBox?.get(
-      defaultValue.id,
+      defaultValue,
       defaultValue: defaultValue,
     );
 
@@ -255,11 +243,11 @@ void main() {
   test('get', () async {
     final defaultValue = mockModel();
 
-    await isolatedBox?.put(defaultValue.id, defaultValue);
+    await isolatedBox?.put(defaultValue, defaultValue);
 
-    final result = await isolatedBox?.get(defaultValue.id);
+    final result = await isolatedBox?.get(defaultValue);
 
-    expect(result, isA<TestModel>());
+    expect(result, isA<int>());
     expect(result, isNotNull);
     expect(result, defaultValue);
   });
@@ -267,7 +255,7 @@ void main() {
   test('getAll when empty', () async {
     final result = await isolatedBox?.getAll();
 
-    expect(result, isA<List<TestModel>>());
+    expect(result, isA<List<int>>());
     expect(result, isEmpty);
   });
 
@@ -277,7 +265,7 @@ void main() {
 
     final result = await isolatedBox?.getAll();
 
-    expect(result, isA<List<TestModel>>());
+    expect(result, isA<List<int>>());
     expect(result, isNotNull);
     expect(result!.length, 3);
   });
@@ -291,9 +279,9 @@ void main() {
 
   test('when key exists in db', () async {
     final item = mockModel();
-    await isolatedBox?.put(item.id, item);
+    await isolatedBox?.put(item, item);
 
-    final result = await isolatedBox?.containsKey(item.id);
+    final result = await isolatedBox?.containsKey(item);
 
     expect(result, isA<bool>());
     expect(result, true);
@@ -311,14 +299,14 @@ void main() {
 
   test('delete when key exists in db', () async {
     final item = mockModel();
-    await isolatedBox?.put(item.id, item);
+    await isolatedBox?.put(item, item);
 
-    var exists = await isolatedBox?.containsKey(item.id);
+    var exists = await isolatedBox?.containsKey(item);
     expect(exists, true);
 
-    await isolatedBox?.delete(item.id);
+    await isolatedBox?.delete(item);
 
-    exists = await isolatedBox?.containsKey(item.id);
+    exists = await isolatedBox?.containsKey(item);
     expect(exists, false);
   });
 
@@ -356,13 +344,13 @@ void main() {
 
   test('deleteAll when keys are existing in db', () async {
     final data = List.generate(3, mockModel);
-    final ids = data.map((e) => e.id);
-    await isolatedBox?.putAll({for (final e in data) e.id: e});
+    final ids = data;
+    await isolatedBox?.putAll({for (final e in data) e: e});
 
     var items = await isolatedBox?.getAll();
     expect(items, isNotEmpty);
     expect(items?.length, 3);
-    expect(items?.map((e) => e.id), ids);
+    expect(items, data);
 
     await isolatedBox?.deleteAll(ids);
 
@@ -415,14 +403,8 @@ void main() {
 
     final path = await isolatedBox?.path;
     await isolatedBox?.deleteFromDisk();
-    final exists = File(path!).existsSync();
+    final exists = await File(path!).exists();
     expect(exists, false);
-
-    try {
-      await isolatedBox?.getAll();
-    } catch (e) {
-      expect(e, isA<AssertionError>());
-    }
   });
 
   // // 10   100   1000   10000   100000
@@ -449,8 +431,8 @@ void main() {
   //   expect(materialFromBox, isNotEmpty);
   //   expect(materialFromBox?.length, count);
   //
-  //   expect(materialFromBox?[0].id, items[0].id);
-  //   expect(materialFromBox?[1].id, items[1].id);
-  //   expect(materialFromBox?[2].id, items[2].id);
+  //   expect(materialFromBox?[0], items[0]);
+  //   expect(materialFromBox?[1], items[1]);
+  //   expect(materialFromBox?[2], items[2]);
   // });
 }
