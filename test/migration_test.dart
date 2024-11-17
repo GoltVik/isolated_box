@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'test_model.dart';
 
 void main() {
+  const boxName = 'box_migrate';
   Future<String> getPath() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     WidgetsFlutterBinding.ensureInitialized();
@@ -28,23 +29,21 @@ void main() {
     );
   }
 
-  Future<void> initHiveBox(String name) async {
+  setUp(() async{
     Hive.init(await getPath());
     if (!Hive.isAdapterRegistered(1)) {
       Hive.registerAdapter(TestModelImplAdapter());
     }
-    final box = await Hive.openBox<TestModel>(name);
+    final box = await Hive.openBox<TestModel>('box_migrate');
     if (box.isEmpty) {
       final items = List.generate(3, mockModel);
       await box.addAll(items);
     }
     await box.close();
-  }
+  });
 
-  const boxName = 'box';
 
   test('migration test with deleteAndCreate policy', () async {
-    await initHiveBox(boxName);
     final isolatedBox = await IsolatedBox.init<TestModel>(
       boxName: boxName,
       migrationPolicy: MigrationPolicy.deleteAndCreate,
@@ -58,7 +57,6 @@ void main() {
   });
 
   test('migration test with migrate policy', () async {
-    await initHiveBox(boxName);
     final isolatedBox = await IsolatedBox.init<TestModel>(
       boxName: boxName,
       migrationPolicy: MigrationPolicy.migrate,

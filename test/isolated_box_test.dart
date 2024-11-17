@@ -44,7 +44,6 @@ void main() {
   tearDownAll(() async {
     try {
       await isolatedBox?.dispose();
-      await isolatedBox?.deleteFromDisk();
     } catch (_) {}
   });
 
