@@ -10,11 +10,6 @@ cross-isolated without loosing Hive functions.
 - Supports asynchronous operations for better performance.
 - Includes various methods for CRUD operations on Hive boxes.
 
-## TODO
-
-- Add data migration support.
-- Add support for box event streaming. 
-
 ## Getting started
 
 ### Installation
@@ -23,7 +18,7 @@ Add the following dependencies to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  isolated_box: ^0.0.2
+  isolated_box: ^0.0.4
 ```
 
 Run flutter pub get to install the dependencies.
