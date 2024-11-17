@@ -7,6 +7,8 @@ import 'dart:ui';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'migration.dart';
+
 part 'isolated_box_worker.dart';
 
 class IsolatedBoxException implements Exception {
@@ -26,6 +28,7 @@ class IsolatedBox<T> {
     this.boxName, {
     required this.fromJson,
     required this.toJson,
+    required this.migrationPolicy,
   });
 
   static Future<IsolatedBox<T>> init<T>({
@@ -33,11 +36,13 @@ class IsolatedBox<T> {
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
     String? dirPath,
+    MigrationPolicy? migrationPolicy,
   }) async {
     final box = IsolatedBox<T>._(
       boxName,
       fromJson: fromJson,
       toJson: toJson,
+      migrationPolicy: migrationPolicy ?? MigrationPolicy.deleteAndCreate,
     );
     return box._init(dirPath: dirPath);
   }
@@ -47,8 +52,12 @@ class IsolatedBox<T> {
   final ToJson<T>? toJson;
   Isolate? _isolate;
   SendPort? _sendPort;
+  MigrationPolicy migrationPolicy;
 
-  Future<IsolatedBox<T>> _init({required String? dirPath}) async {
+  Future<IsolatedBox<T>> _init({
+    required String? dirPath,
+    Map<dynamic, T> items = const {},
+  }) async {
     final sendPort = IsolateNameServer.lookupPortByName(boxName);
     if (await _isIsolateResponsive(sendPort)) {
       _sendPort = sendPort;
@@ -66,12 +75,25 @@ class IsolatedBox<T> {
     final response = await receivePort.first;
 
     if (response is String) {
-      throw Exception('Error initializing HiveIsolatedBox: $response');
+      _isolate?.kill(priority: Isolate.immediate);
+      _isolate = null;
+
+      if (response.startsWith('e: HiveError:')) {
+        final items = await IsolatedBoxMigration<T>(
+          policy: migrationPolicy,
+          path: dirPath,
+          boxName: boxName,
+        ).migrate();
+        return _init(dirPath: dirPath, items: items);
+      } else {
+        throw response.substring(3);
+      }
     }
 
     _sendPort = response as SendPort;
+    receivePort.close();
 
-    await _preOpen();
+    if (items.isNotEmpty) await putAll(items);
     IsolateNameServer.registerPortWithName(_sendPort!, boxName);
     return this;
   }
@@ -149,11 +171,6 @@ class IsolatedBox<T> {
   }
 
   //region Box methods
-  Future<void> _preOpen() {
-    assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
-    return _makeIsolateCall(_Functions.preOpen);
-  }
-
   Future<String> get name async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 

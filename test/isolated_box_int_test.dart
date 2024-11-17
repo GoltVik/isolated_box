@@ -32,8 +32,9 @@ void main() {
   });
 
   tearDownAll(() async {
-    await isolatedBox?.dispose();
-    await isolatedBox?.deleteFromDisk();
+    try {
+      await isolatedBox?.dispose();
+    } catch (_) {}
   });
 
   test('name', () async {

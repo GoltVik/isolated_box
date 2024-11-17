@@ -35,3 +35,6 @@ build/
 files.hive
 
 box.hive
+
+*.g.dart
+*.freezed.dart
