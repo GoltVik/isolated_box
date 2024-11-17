@@ -71,6 +71,7 @@ class IsolatedBox<T> {
     _isolate = await Isolate.spawn(
       _collectionIsolate<T>,
       [receivePort.sendPort, boxName, dirPath],
+      debugName: boxName,
     );
 
     final response = await receivePort.first;
@@ -101,13 +102,12 @@ class IsolatedBox<T> {
 
   Future<bool> _isIsolateResponsive(SendPort? sendPort) async {
     if (sendPort == null) return false;
-    final response = ReceivePort();
-    sendPort.send([
-      {'action': 'ping'},
-      response.sendPort,
-    ]);
+
     try {
+      final response = ReceivePort();
+      sendPort.send(_ActionModel(_Functions.ping, null, response.sendPort));
       await response.first.timeout(const Duration(milliseconds: 300));
+      response.close();
       return true;
     } catch (_) {
       IsolateNameServer.removePortNameMapping(boxName);
@@ -443,7 +443,6 @@ class IsolatedBox<T> {
 
   Future<void> dispose() async {
     if (_sendPort != null) {
-      await flush();
       await _makeIsolateCall<void>(_Functions.dispose);
     }
     _isolate?.kill(priority: Isolate.immediate);

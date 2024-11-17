@@ -47,21 +47,30 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
 
     try {
       switch (model.action) {
+        case _Functions.ping:
+          model.responsePort.send('pong');
+          break;
+
         case _Functions.name:
           model.responsePort.send(box.name);
+          break;
 
         case _Functions.isOpen:
           model.responsePort.send(box.isOpen);
+          break;
 
         case _Functions.path:
           model.responsePort.send(box.path);
+          break;
 
         case _Functions.keys:
           final keys = box.keys.toList();
           model.responsePort.send(keys);
+          break;
 
         case _Functions.length:
           model.responsePort.send(box.length);
+          break;
 
         case _Functions.keyAt:
           final index = data as int;
@@ -71,73 +80,89 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
           } catch (e) {
             model.responsePort.send(null);
           }
+          break;
+
 
         case _Functions.containsKey:
           final key = data;
           final contains = box.containsKey(key);
           model.responsePort.send(contains);
+          break;
 
         case _Functions.put:
           final entry = data as MapEntry<dynamic, Uint8List>;
           await box.put(entry.key, entry.value);
           model.responsePort.send(true);
+          break;
 
         case _Functions.putAt:
           final entry = data as MapEntry<int, Uint8List>;
           await box.putAt(entry.key, entry.value);
           model.responsePort.send(true);
+          break;
 
         case _Functions.putAll:
           final values = data as Map<dynamic, Uint8List>;
           await box.putAll(values);
           model.responsePort.send(true);
+          break;
 
         case _Functions.add:
           final input = data as Uint8List;
           final key = await box.add(input);
           model.responsePort.send(key);
+          break;
 
         case _Functions.addAll:
           final input = data.cast<Uint8List>();
           final keys = await box.addAll(input);
           model.responsePort.send(keys.toList());
+          break;
 
         case _Functions.delete:
           final key = data;
           await box.delete(key);
           model.responsePort.send(true);
+          break;
 
         case _Functions.deleteAt:
           final index = data as int;
           await box.deleteAt(index);
           model.responsePort.send(true);
+          break;
 
         case _Functions.deleteAll:
           final keys = data as Iterable<dynamic>;
           await box.deleteAll(keys);
           model.responsePort.send(true);
+          break;
 
         case _Functions.get:
           final key = data;
           final result = box.get(key);
           model.responsePort.send(result);
+          break;
 
         case _Functions.getAt:
           final index = data as int;
           final result = box.getAt(index);
           model.responsePort.send(result);
+          break;
 
         case _Functions.getAll:
           final values = box.values.toList();
           model.responsePort.send(values);
+          break;
 
         case _Functions.clear:
           await box.clear();
           model.responsePort.send(true);
+          break;
 
         case _Functions.flush:
           await box.flush();
           model.responsePort.send(true);
+          break;
 
         case _Functions.dispose:
           for (final subscription in subscriptions.entries) {
@@ -147,6 +172,7 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
           await box.close();
           model.responsePort.send(true);
           receivePort.close();
+          break;
 
         case _Functions.deleteFromDisk:
           for (final subscription in subscriptions.entries) {
@@ -156,6 +182,7 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
           await box.deleteFromDisk();
           model.responsePort.send(true);
           receivePort.close();
+          break;
 
         case _Functions.watch:
           final key = data;
@@ -164,10 +191,12 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
               .listen((event) => model.responsePort.send(event));
 
           subscriptions[model.responsePort] = subscription;
+          break;
 
         case _Functions.unwatch:
           final subscription = subscriptions.remove(model.responsePort);
           await subscription?.cancel();
+          break;
 
         default:
           throw UnsupportedError("Unsupported action: ${data['action']}");
@@ -179,6 +208,7 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
 }
 
 class _Functions {
+  static const ping = 'ping';
   static const name = 'name';
   static const isOpen = 'isOpen';
   static const path = 'path';
