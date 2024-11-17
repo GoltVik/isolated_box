@@ -4,6 +4,7 @@ import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -401,6 +402,31 @@ class IsolatedBox<T> {
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
+  }
+
+  Stream<BoxEvent> watch({dynamic key}) {
+    assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
+
+    final receivePort = ReceivePort();
+    _sendPort!.send(_ActionModel(_Functions.watch, key, receivePort.sendPort));
+
+    return receivePort.cast<BoxEvent>().map((event) {
+      if (event.value is Uint8List) {
+        final jsonString = utf8.decode(event.value as Uint8List);
+        final mapObject = jsonDecode(jsonString);
+        final value = fromJson?.call(mapObject) ?? mapObject as T;
+        return BoxEvent(event.key, value, event.deleted);
+      }
+      return event;
+    }).asBroadcastStream(
+      onCancel: (subscription) {
+        _sendPort!.send(
+          _ActionModel(_Functions.unwatch, key, receivePort.sendPort),
+        );
+        subscription.cancel();
+        receivePort.close();
+      },
+    );
   }
 
   Future<void> deleteFromDisk() async {

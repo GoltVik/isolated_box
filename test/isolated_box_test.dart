@@ -8,6 +8,7 @@ import 'package:isolated_box/isolated_box.dart';
 import 'test_model.dart';
 
 void main() {
+  const boxName = 'files';
   IsolatedBox<TestModel>? isolatedBox;
 
   TestModel mockModel([int? index]) => TestModel(
@@ -26,7 +27,7 @@ void main() {
     );
 
     isolatedBox = await IsolatedBox.init<TestModel>(
-      boxName: 'files',
+      boxName: boxName,
       fromJson: TestModel.fromJson,
       toJson: TestModel.toJsonString,
     );
