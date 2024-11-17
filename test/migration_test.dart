@@ -9,6 +9,7 @@ import 'test_model.dart';
 
 void main() {
   const boxName = 'box_migrate';
+
   Future<String> getPath() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     WidgetsFlutterBinding.ensureInitialized();
@@ -29,19 +30,18 @@ void main() {
     );
   }
 
-  setUp(() async{
+  setUp(() async {
     Hive.init(await getPath());
     if (!Hive.isAdapterRegistered(1)) {
       Hive.registerAdapter(TestModelImplAdapter());
     }
-    final box = await Hive.openBox<TestModel>('box_migrate');
+    final box = await Hive.openBox<TestModel>(boxName);
     if (box.isEmpty) {
       final items = List.generate(3, mockModel);
       await box.addAll(items);
     }
     await box.close();
   });
-
 
   test('migration test with deleteAndCreate policy', () async {
     final isolatedBox = await IsolatedBox.init<TestModel>(
@@ -53,6 +53,7 @@ void main() {
 
     final objects = await isolatedBox.getAll();
     expect(objects.length, 0);
+
     await isolatedBox.deleteFromDisk();
   });
 
@@ -66,6 +67,7 @@ void main() {
 
     final objects = await isolatedBox.getAll();
     expect(objects.length, 3);
+
     await isolatedBox.deleteFromDisk();
   });
 }

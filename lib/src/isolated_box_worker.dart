@@ -36,6 +36,8 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
   final receivePort = ReceivePort();
   mainSendPort.send(receivePort.sendPort);
 
+  final Map<SendPort, StreamSubscription<BoxEvent>> subscriptions = {};
+
   await for (final model in receivePort) {
     if (model is! _ActionModel) {
       throw ArgumentError('Invalid model type: ${model.runtimeType}');
@@ -138,14 +140,34 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
           model.responsePort.send(true);
 
         case _Functions.dispose:
+          for (final subscription in subscriptions.entries) {
+            await subscription.value.cancel();
+            subscriptions.remove(subscription.key);
+          }
           await box.close();
           model.responsePort.send(true);
           receivePort.close();
 
         case _Functions.deleteFromDisk:
+          for (final subscription in subscriptions.entries) {
+            await subscription.value.cancel();
+            subscriptions.remove(subscription.key);
+          }
           await box.deleteFromDisk();
           model.responsePort.send(true);
           receivePort.close();
+
+        case _Functions.watch:
+          final key = data;
+          final subscription = box
+              .watch(key: key)
+              .listen((event) => model.responsePort.send(event));
+
+          subscriptions[model.responsePort] = subscription;
+
+        case _Functions.unwatch:
+          final subscription = subscriptions.remove(model.responsePort);
+          await subscription?.cancel();
 
         default:
           throw UnsupportedError("Unsupported action: ${data['action']}");
@@ -179,4 +201,6 @@ class _Functions {
   static const deleteFromDisk = 'deleteFromDisk';
   static const flush = 'flush';
   static const dispose = 'dispose';
+  static const watch = 'watch';
+  static const unwatch = 'unwatch';
 }

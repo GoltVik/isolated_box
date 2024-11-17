@@ -6,10 +6,9 @@ part 'test_model.g.dart';
 
 @freezed
 class TestModel extends HiveObject with _$TestModel {
-
   @HiveType(typeId: 1)
   factory TestModel({
-    @HiveField(0)  required String id,
+    @HiveField(0) required String id,
     @HiveField(1) required DateTime updatedAt,
   }) = _TestModel;
 
