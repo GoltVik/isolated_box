@@ -45,10 +45,6 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
 
     try {
       switch (model.action) {
-        case _Functions.preOpen:
-          if (box.length > 0) box.getAt(0);
-          model.responsePort.send(true);
-
         case _Functions.name:
           model.responsePort.send(box.name);
 
@@ -161,7 +157,6 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
 }
 
 class _Functions {
-  static const preOpen = 'preOpen';
   static const name = 'name';
   static const isOpen = 'isOpen';
   static const path = 'path';
@@ -184,30 +179,4 @@ class _Functions {
   static const deleteFromDisk = 'deleteFromDisk';
   static const flush = 'flush';
   static const dispose = 'dispose';
-
-  List<String> get values => [
-        preOpen,
-        name,
-        isOpen,
-        path,
-        length,
-        keys,
-        keyAt,
-        containsKey,
-        put,
-        putAt,
-        putAll,
-        add,
-        addAll,
-        delete,
-        deleteAt,
-        deleteAll,
-        get,
-        getAt,
-        getAll,
-        clear,
-        deleteFromDisk,
-        flush,
-        dispose,
-      ];
 }

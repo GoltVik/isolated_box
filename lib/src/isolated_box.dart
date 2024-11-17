@@ -91,8 +91,8 @@ class IsolatedBox<T> {
     }
 
     _sendPort = response as SendPort;
+    receivePort.close();
 
-    await _preOpen();
     if (items.isNotEmpty) await putAll(items);
     IsolateNameServer.registerPortWithName(_sendPort!, boxName);
     return this;
@@ -171,11 +171,6 @@ class IsolatedBox<T> {
   }
 
   //region Box methods
-  Future<void> _preOpen() {
-    assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
-    return _makeIsolateCall(_Functions.preOpen);
-  }
-
   Future<String> get name async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
