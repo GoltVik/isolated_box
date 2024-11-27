@@ -1,18 +1,13 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
 
 part 'test_model.freezed.dart';
-part 'test_model.g.dart';
 
 @freezed
-class TestModel extends HiveObject with _$TestModel {
-  @HiveType(typeId: 1)
+class TestModel with _$TestModel {
   factory TestModel({
-    @HiveField(0) required String id,
-    @HiveField(1) required DateTime updatedAt,
+    required String id,
+    required DateTime updatedAt,
   }) = _TestModel;
-
-  TestModel._();
 
   static TestModel fromJson(Map<String, dynamic> json) {
     return TestModel(

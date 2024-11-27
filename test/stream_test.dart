@@ -29,7 +29,7 @@ void main() {
   test('stream test on collection', () async {
     final isolatedBox = await IsolatedBox.init<TestModel>(
       boxName: boxName,
-      migrationPolicy: MigrationPolicy.deleteAndCreate,
+      migrationStrategy: MigrationStrategy.deleteAndCreate,
       fromJson: TestModel.fromJson,
       toJson: TestModel.toJsonString,
     );
@@ -54,7 +54,7 @@ void main() {
   test('stream test on collection addAll', () async {
     final isolatedBox = await IsolatedBox.init<TestModel>(
       boxName: boxName,
-      migrationPolicy: MigrationPolicy.deleteAndCreate,
+      migrationStrategy: MigrationStrategy.deleteAndCreate,
       fromJson: TestModel.fromJson,
       toJson: TestModel.toJsonString,
     );
@@ -80,7 +80,7 @@ void main() {
   test('stream test on key', () async {
     final isolatedBox = await IsolatedBox.init<TestModel>(
       boxName: boxName,
-      migrationPolicy: MigrationPolicy.deleteAndCreate,
+      migrationStrategy: MigrationStrategy.deleteAndCreate,
       fromJson: TestModel.fromJson,
       toJson: TestModel.toJsonString,
     );
@@ -109,7 +109,7 @@ void main() {
   test('stream test on key with deletion', () async {
     final isolatedBox = await IsolatedBox.init<TestModel>(
       boxName: boxName,
-      migrationPolicy: MigrationPolicy.deleteAndCreate,
+      migrationStrategy: MigrationStrategy.deleteAndCreate,
       fromJson: TestModel.fromJson,
       toJson: TestModel.toJsonString,
     );

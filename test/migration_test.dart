@@ -5,7 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:isolated_box/isolated_box.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'test_model.dart';
+import 'test_model_hive.dart';
 
 void main() {
   const boxName = 'box_migrate';
@@ -23,8 +23,8 @@ void main() {
     return dir.path;
   }
 
-  TestModel mockModel([int? index]) {
-    return TestModel(
+  TestModelHive mockModel([int? index]) {
+    return TestModelHive(
       id: index?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
       updatedAt: DateTime.now(),
     );
@@ -33,9 +33,9 @@ void main() {
   setUp(() async {
     Hive.init(await getPath());
     if (!Hive.isAdapterRegistered(1)) {
-      Hive.registerAdapter(TestModelImplAdapter());
+      Hive.registerAdapter(TestModelHiveImplAdapter());
     }
-    final box = await Hive.openBox<TestModel>(boxName);
+    final box = await Hive.openBox<TestModelHive>(boxName);
     if (box.isEmpty) {
       final items = List.generate(3, mockModel);
       await box.addAll(items);
@@ -44,11 +44,11 @@ void main() {
   });
 
   test('migration test with deleteAndCreate policy', () async {
-    final isolatedBox = await IsolatedBox.init<TestModel>(
+    final isolatedBox = await IsolatedBox.init<TestModelHive>(
       boxName: boxName,
-      migrationPolicy: MigrationPolicy.deleteAndCreate,
-      fromJson: TestModel.fromJson,
-      toJson: TestModel.toJsonString,
+      migrationStrategy: MigrationStrategy.deleteAndCreate,
+      fromJson: TestModelHive.fromJson,
+      toJson: TestModelHive.toJsonString,
     );
 
     final objects = await isolatedBox.getAll();
@@ -58,11 +58,11 @@ void main() {
   });
 
   test('migration test with migrate policy', () async {
-    final isolatedBox = await IsolatedBox.init<TestModel>(
+    final isolatedBox = await IsolatedBox.init<TestModelHive>(
       boxName: boxName,
-      migrationPolicy: MigrationPolicy.migrate,
-      fromJson: TestModel.fromJson,
-      toJson: TestModel.toJsonString,
+      migrationStrategy: MigrationStrategy.migrate,
+      fromJson: TestModelHive.fromJson,
+      toJson: TestModelHive.toJsonString,
     );
 
     final objects = await isolatedBox.getAll();

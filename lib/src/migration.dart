@@ -1,13 +1,11 @@
-import 'package:hive/hive.dart';
+part of 'isolated_box.dart';
 
-enum MigrationPolicy { deleteAndCreate, migrate }
-
-class IsolatedBoxMigration<T> {
-  final MigrationPolicy policy;
+class _IsolatedBoxMigration<T> {
+  final MigrationStrategy policy;
   final String boxName;
   final String path;
 
-  IsolatedBoxMigration({
+  _IsolatedBoxMigration({
     required this.policy,
     required this.path,
     required this.boxName,
@@ -19,10 +17,10 @@ class IsolatedBoxMigration<T> {
     final migrationObjects = <dynamic, T>{};
 
     switch (policy) {
-      case MigrationPolicy.deleteAndCreate:
+      case MigrationStrategy.deleteAndCreate:
         await box.clear();
 
-      case MigrationPolicy.migrate:
+      case MigrationStrategy.migrate:
         for (var i = 0; i < box.length; i++) {
           final key = box.keyAt(i);
           final value = box.getAt(i);
