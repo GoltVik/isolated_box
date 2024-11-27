@@ -82,7 +82,6 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
           }
           break;
 
-
         case _Functions.containsKey:
           final key = data;
           final contains = box.containsKey(key);

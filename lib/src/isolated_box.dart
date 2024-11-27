@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -95,7 +94,7 @@ class IsolatedBox<T> {
     _sendPort = response as SendPort;
     receivePort.close();
 
-    if (items.isNotEmpty) await putAll(items);
+    if (items.isNotEmpty) await _migrateAll(items);
     IsolateNameServer.registerPortWithName(_sendPort!, boxName);
     return this;
   }
@@ -115,43 +114,57 @@ class IsolatedBox<T> {
     }
   }
 
+  Uint8List _objectToBytes(T object) {
+    final mapObject = toJson?.call(object) ?? object;
+    final jsonString = jsonEncode(mapObject);
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  T _objectFromBytes(Uint8List bytes) {
+    final jsonString = utf8.decode(bytes);
+    final mapObject = jsonDecode(jsonString);
+    return fromJson?.call(mapObject) ?? mapObject as T;
+  }
+
   Future<E> _makeIsolateCall<E>(String action, [dynamic input]) async {
-    Uint8List objectToBytes(T object) {
-      final mapObject = toJson?.call(object) ?? object;
-      final jsonString = jsonEncode(mapObject);
-      return Uint8List.fromList(utf8.encode(jsonString));
-    }
-
-    T objectFromBytes(Uint8List bytes) {
-      final jsonString = utf8.decode(bytes);
-      final mapObject = jsonDecode(jsonString);
-      return fromJson?.call(mapObject) ?? mapObject as T;
-    }
-
-    final formatedInput = () {
+    dynamic formatInput({dynamic input, required String action}) {
       if (input is MapEntry<int, T>) {
-        return MapEntry(input.key, objectToBytes(input.value));
+        return MapEntry(input.key, _objectToBytes(input.value));
       }
       if (input is MapEntry<String, T>) {
-        return MapEntry(input.key, objectToBytes(input.value));
+        return MapEntry(input.key, _objectToBytes(input.value));
       }
       if (input is MapEntry<dynamic, T>) {
-        return MapEntry(input.key, objectToBytes(input.value));
+        return MapEntry(input.key, _objectToBytes(input.value));
       }
       if (input is Iterable<T> || input is List<T>) {
-        return input.map(objectToBytes).toList();
+        return input.map(_objectToBytes).toList();
       }
       if (input is Map<dynamic, T>) {
-        return input.map((key, value) => MapEntry(key, objectToBytes(value)));
+        return input.map((key, value) => MapEntry(key, _objectToBytes(value)));
       }
       if (input is T && action == _Functions.add) {
-        return objectToBytes(input);
+        return _objectToBytes(input);
       }
       return input;
-    }();
+    }
+
+    E formatOutput(dynamic output) {
+      if (output is List<Uint8List>) {
+        return output.map(_objectFromBytes).toList() as E;
+      }
+
+      if (output is Uint8List) return _objectFromBytes(output) as E;
+
+      return output;
+    }
+
+    final formatedInput = formatInput(input: input, action: action);
 
     final response = ReceivePort();
-    _sendPort!.send(_ActionModel(action, formatedInput, response.sendPort));
+    _sendPort!.send(
+      _ActionModel(action, formatedInput, response.sendPort),
+    );
 
     final result = await response.first;
     response.close();
@@ -160,15 +173,7 @@ class IsolatedBox<T> {
       throw Exception(result.toString().substring(3));
     }
 
-    final parsedResult = () {
-      if (result is List<Uint8List>) {
-        return result.map(objectFromBytes).toList();
-      }
-      if (result is Uint8List) return objectFromBytes(result);
-      return result;
-    }();
-
-    return parsedResult as E;
+    return formatOutput(result);
   }
 
   //region Box methods
@@ -291,6 +296,20 @@ class IsolatedBox<T> {
 
     try {
       await _makeIsolateCall<void>(_Functions.putAll, entries);
+    } catch (e) {
+      throw IsolatedBoxException(e.toString());
+    }
+  }
+
+  Future<void> _migrateAll(Map<dynamic, T> entries) async {
+    assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
+
+    final input = entries.map(
+      (key, entry) => MapEntry(key, _objectToBytes(entry)),
+    );
+
+    try {
+      await _makeIsolateCall<void>(_Functions.putAll, input);
     } catch (e) {
       throw IsolatedBoxException(e.toString());
     }
