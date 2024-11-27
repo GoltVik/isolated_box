@@ -7,58 +7,80 @@ import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'migration.dart';
+import 'migration_strategy.dart';
 
 part 'isolated_box_worker.dart';
 
+part 'migration.dart';
+
+/// Exception thrown when an error occurs in the [IsolatedBox] class.
 class IsolatedBoxException implements Exception {
+  /// Creates an [IsolatedBoxException] with the given [message].
   IsolatedBoxException(this.message);
 
+  /// The error message.
   final String message;
 
   @override
   String toString() => 'HiveIsolatedBoxException: $message';
 }
 
+/// Parser function to convert a JSON map to a Dart object.
 typedef FromJson<T> = T Function(Map<String, Object?>);
+
+/// Parser function to convert a Dart object to a JSON map.
 typedef ToJson<T> = Map<String, Object?> Function(T);
 
+/// A Hive box that runs in an isolate.
 class IsolatedBox<T> {
   IsolatedBox._(
-    this.boxName, {
-    required this.fromJson,
-    required this.toJson,
-    required this.migrationPolicy,
-  });
+    this._boxName, {
+    required FromJson<T>? fromJson,
+    required ToJson<T>? toJson,
+    required MigrationStrategy migrationPolicy,
+  })  : _migrationPolicy = migrationPolicy,
+        _fromJson = fromJson,
+        _toJson = toJson;
 
+  /// Initializes an [IsolatedBox] with the given parameters.
+  ///
+  /// [boxName] is the name of the box.
+  ///
+  /// [fromJson] is a function that converts a JSON map to a Dart object.
+  ///
+  /// [toJson] is a function that converts a Dart object to a JSON map.
+  ///
+  /// [dirPath] is the path where the box will be stored.
+  ///
+  /// [migrationStrategy] is the strategy to use when migrating data from a non-isolated box.
   static Future<IsolatedBox<T>> init<T>({
     required String boxName,
     FromJson<T>? fromJson,
     ToJson<T>? toJson,
     String? dirPath,
-    MigrationPolicy? migrationPolicy,
+    MigrationStrategy? migrationStrategy,
   }) async {
     final box = IsolatedBox<T>._(
       boxName,
       fromJson: fromJson,
       toJson: toJson,
-      migrationPolicy: migrationPolicy ?? MigrationPolicy.deleteAndCreate,
+      migrationPolicy: migrationStrategy ?? MigrationStrategy.deleteAndCreate,
     );
     return box._init(dirPath: dirPath);
   }
 
-  final String boxName;
-  final FromJson<T>? fromJson;
-  final ToJson<T>? toJson;
+  final String _boxName;
+  final FromJson<T>? _fromJson;
+  final ToJson<T>? _toJson;
+  final MigrationStrategy _migrationPolicy;
   Isolate? _isolate;
   SendPort? _sendPort;
-  MigrationPolicy migrationPolicy;
 
   Future<IsolatedBox<T>> _init({
     required String? dirPath,
     Map<dynamic, T> items = const {},
   }) async {
-    final sendPort = IsolateNameServer.lookupPortByName(boxName);
+    final sendPort = IsolateNameServer.lookupPortByName(_boxName);
     if (await _isIsolateResponsive(sendPort)) {
       _sendPort = sendPort;
       return this;
@@ -69,8 +91,8 @@ class IsolatedBox<T> {
     final receivePort = ReceivePort();
     _isolate = await Isolate.spawn(
       _collectionIsolate<T>,
-      [receivePort.sendPort, boxName, dirPath],
-      debugName: boxName,
+      [receivePort.sendPort, _boxName, dirPath],
+      debugName: _boxName,
     );
 
     final response = await receivePort.first;
@@ -80,10 +102,10 @@ class IsolatedBox<T> {
       _isolate = null;
 
       if (response.startsWith('e: HiveError:')) {
-        final items = await IsolatedBoxMigration<T>(
-          policy: migrationPolicy,
+        final items = await _IsolatedBoxMigration<T>(
+          policy: _migrationPolicy,
           path: dirPath,
-          boxName: boxName,
+          boxName: _boxName,
         ).migrate();
         return _init(dirPath: dirPath, items: items);
       } else {
@@ -95,7 +117,7 @@ class IsolatedBox<T> {
     receivePort.close();
 
     if (items.isNotEmpty) await _migrateAll(items);
-    IsolateNameServer.registerPortWithName(_sendPort!, boxName);
+    IsolateNameServer.registerPortWithName(_sendPort!, _boxName);
     return this;
   }
 
@@ -109,13 +131,13 @@ class IsolatedBox<T> {
       response.close();
       return true;
     } catch (_) {
-      IsolateNameServer.removePortNameMapping(boxName);
+      IsolateNameServer.removePortNameMapping(_boxName);
       return false;
     }
   }
 
   Uint8List _objectToBytes(T object) {
-    final mapObject = toJson?.call(object) ?? object;
+    final mapObject = _toJson?.call(object) ?? object;
     final jsonString = jsonEncode(mapObject);
     return Uint8List.fromList(utf8.encode(jsonString));
   }
@@ -123,7 +145,7 @@ class IsolatedBox<T> {
   T _objectFromBytes(Uint8List bytes) {
     final jsonString = utf8.decode(bytes);
     final mapObject = jsonDecode(jsonString);
-    return fromJson?.call(mapObject) ?? mapObject as T;
+    return _fromJson?.call(mapObject) ?? mapObject as T;
   }
 
   Future<E> _makeIsolateCall<E>(String action, [dynamic input]) async {
@@ -177,6 +199,7 @@ class IsolatedBox<T> {
   }
 
   //region Box methods
+  /// The name of the box.
   Future<String> get name async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -188,6 +211,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Whether this box is currently open.
   Future<bool> get isOpen async {
     if (_sendPort == null) return false;
 
@@ -199,6 +223,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// The location of the box in the file system.
   Future<String?> get path async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -210,6 +235,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// The number of entries in the box.
   Future<int> get length async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -221,6 +247,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Returns `true` if there are no entries in this box.
   Future<bool> get isEmpty async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -232,12 +259,14 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Returns true if there is at least one entries in this box.
   Future<bool> get isNotEmpty async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
     return !(await isEmpty);
   }
 
+  /// All the keys in the box.
   Future<List<dynamic>> get keys async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -249,6 +278,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Get the n-th key in the box.
   Future<dynamic> keyAt(int index) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -260,6 +290,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Checks whether the box contains the [key].
   Future<bool> containsKey(dynamic key) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -271,6 +302,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Saves the [key] - [value] pair.
   Future<void> put(dynamic key, T value) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -281,6 +313,8 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Associates the [value] with the n-th key. An exception is raised if the
+  /// key does not exist.
   Future<void> putAt(int index, T value) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -291,6 +325,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Saves all the key - value pairs in the [entries] map.
   Future<void> putAll(Map<dynamic, T> entries) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -315,6 +350,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Saves the [value] with an auto-increment key.
   Future<int> add(T value) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -326,6 +362,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Saves all the [values] with auto-increment keys.
   Future<List<dynamic>> addAll(Iterable<T> values) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -340,6 +377,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Deletes the given [key] from the box.
   Future<void> delete(dynamic key) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -350,6 +388,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Deletes the n-th key from the box.
   Future<void> deleteAt(int index) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -360,6 +399,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Deletes all the given [keys] from the box.
   Future<void> deleteAll(Iterable<dynamic> keys) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -370,6 +410,8 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Returns the value associated with the [key].
+  /// If the key does not exist, [defaultValue] is returned.
   Future<T?> get(dynamic key, {T? defaultValue}) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -381,6 +423,8 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Returns the value associated with the n-th key.
+  /// If the key does not exist, [defaultValue] is returned.
   Future<T?> getAt(int index, {T? defaultValue}) async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -392,6 +436,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Returns all the values from the box.
   Future<List<T>> getAll() async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -403,6 +448,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Deletes all the entries in the box.
   Future<void> clear() async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -413,6 +459,8 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Induces compaction manually. This is rarely needed. You should consider
+  /// providing a custom compaction strategy instead.
   Future<void> flush() async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -423,6 +471,9 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Returns a broadcast stream of change events.
+  /// If the [key] parameter is provided, only events for the specified key are
+  /// broadcast.
   Stream<BoxEvent> watch({dynamic key}) {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -433,7 +484,7 @@ class IsolatedBox<T> {
       if (event.value is Uint8List) {
         final jsonString = utf8.decode(event.value as Uint8List);
         final mapObject = jsonDecode(jsonString);
-        final value = fromJson?.call(mapObject) ?? mapObject as T;
+        final value = _fromJson?.call(mapObject) ?? mapObject as T;
         return BoxEvent(event.key, value, event.deleted);
       }
       return event;
@@ -448,6 +499,7 @@ class IsolatedBox<T> {
     );
   }
 
+  /// Removes all entries from the box.
   Future<void> deleteFromDisk() async {
     assert(_sendPort != null, 'HiveIsolatedBox is not initialized');
 
@@ -460,6 +512,7 @@ class IsolatedBox<T> {
     }
   }
 
+  /// Closes the box.
   Future<void> dispose() async {
     if (_sendPort != null) {
       await _makeIsolateCall<void>(_Functions.dispose);
@@ -467,7 +520,7 @@ class IsolatedBox<T> {
     _isolate?.kill(priority: Isolate.immediate);
     _isolate = null;
     _sendPort = null;
-    IsolateNameServer.removePortNameMapping(boxName);
+    IsolateNameServer.removePortNameMapping(_boxName);
   }
 //endregion
 }

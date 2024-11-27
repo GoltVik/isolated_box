@@ -5,11 +5,11 @@ import 'package:hive/hive.dart';
 import 'package:isolated_box/isolated_box.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'test_model.dart';
+import 'test_model_hive.dart';
 
 void main() {
   const boxName = 'models';
-  TestModel mockModel([int? index]) => TestModel(
+  TestModelHive mockModel([int? index]) => TestModelHive(
         id: index?.toString() ??
             DateTime.now().microsecondsSinceEpoch.toString(),
         updatedAt: DateTime.now(),
@@ -32,10 +32,10 @@ void main() {
   group('IsolatedBox', () {
     for (final count in testCounts) {
       test('benchmark for $count', () async {
-        final isolatedBox = await IsolatedBox.init<TestModel>(
+        final isolatedBox = await IsolatedBox.init<TestModelHive>(
           boxName: boxName,
-          fromJson: TestModel.fromJson,
-          toJson: TestModel.toJsonString,
+          fromJson: TestModelHive.fromJson,
+          toJson: TestModelHive.toJsonString,
         );
 
         final items = List.generate(count, (index) => mockModel(index));
@@ -43,7 +43,7 @@ void main() {
         await isolatedBox.addAll(items).measure('addAll');
         final materialFromBox = await isolatedBox.getAll().measure('getAll');
 
-        expect(materialFromBox, isA<List<TestModel>>());
+        expect(materialFromBox, isA<List<TestModelHive>>());
         expect(materialFromBox, isNotEmpty);
         expect(materialFromBox.length, count);
 
@@ -64,17 +64,17 @@ void main() {
         final path = (await getApplicationDocumentsDirectory()).path;
         Hive.init(path);
         if (!Hive.isAdapterRegistered(1)) {
-          Hive.registerAdapter(TestModelImplAdapter());
+          Hive.registerAdapter(TestModelHiveImplAdapter());
         }
 
-        final box = (await Hive.openBox<TestModel>(boxName));
+        final box = (await Hive.openBox<TestModelHive>(boxName));
         final items = List.generate(count, (index) => mockModel(index));
 
         await box.addAll(items).measure('addAll');
         final materialFromBox =
             await Future.value(box.values.toList()).measure('getAll');
 
-        expect(materialFromBox, isA<List<TestModel>>());
+        expect(materialFromBox, isA<List<TestModelHive>>());
         expect(materialFromBox, isNotEmpty);
         expect(materialFromBox.length, count);
 

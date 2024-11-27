@@ -5,8 +5,6 @@ import 'package:hive/hive.dart';
 import 'package:isolated_box/isolated_box.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'test_model.dart';
-
 void main() {
   const boxName = 'numbers';
 
@@ -49,9 +47,6 @@ void main() {
       test('benchmark for $count', () async {
         final path = (await getApplicationDocumentsDirectory()).path;
         Hive.init(path);
-        if (!Hive.isAdapterRegistered(1)) {
-          Hive.registerAdapter(TestModelImplAdapter());
-        }
 
         final box = (await Hive.openBox<int>(boxName));
         final items = List.generate(count, (index) => index);

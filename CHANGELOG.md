@@ -13,3 +13,7 @@
 ## 0.0.4
 
 * Added stream support.
+
+## 1.0.0
+
+* Stable release with cross-isolate support.
