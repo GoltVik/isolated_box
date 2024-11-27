@@ -1,5 +1,23 @@
 part of 'isolated_box.dart';
 
+class _ActionModel {
+  final String action;
+  final dynamic data;
+  final SendPort responsePort;
+
+  //data as null
+  //data as int
+  //data as dynamic (key)
+  //data as MapEntry<String,Uint8List>
+  //data as MapEntry<int, Uint8List>
+  //data as Map<dynamic, Uint8List>
+  //data as Uint8List
+  //data as List<Uint8List>
+  //data as Iterable<dynamic> (keys)
+
+  _ActionModel(this.action, this.data, this.responsePort);
+}
+
 Future<void> _collectionIsolate<T>(List<dynamic> args) async {
   final mainSendPort = args[0] as SendPort;
   final boxName = args[1] as String;
@@ -18,131 +36,178 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
   final receivePort = ReceivePort();
   mainSendPort.send(receivePort.sendPort);
 
-  await for (final message in receivePort) {
-    final portInput = message as List;
-    final data = portInput[0] as Map<Object, Object?>;
-    final responsePort = portInput[1] as SendPort;
+  final Map<SendPort, StreamSubscription<BoxEvent>> subscriptions = {};
+
+  await for (final model in receivePort) {
+    if (model is! _ActionModel) {
+      throw ArgumentError('Invalid model type: ${model.runtimeType}');
+    }
+
+    final data = model.data;
 
     try {
-      switch (data['action']) {
-        case _Functions.preOpen:
-          if (box.length > 0) box.getAt(0);
-          responsePort.send(true);
+      switch (model.action) {
+        case _Functions.ping:
+          model.responsePort.send('pong');
+          break;
 
         case _Functions.name:
-          responsePort.send(box.name);
+          model.responsePort.send(box.name);
+          break;
 
         case _Functions.isOpen:
-          responsePort.send(box.isOpen);
+          model.responsePort.send(box.isOpen);
+          break;
 
         case _Functions.path:
-          responsePort.send(box.path);
+          model.responsePort.send(box.path);
+          break;
 
         case _Functions.keys:
-          final keys = box.keys.map((key) => key.toString()).toList();
-          responsePort.send(keys);
+          final keys = box.keys.toList();
+          model.responsePort.send(keys);
+          break;
 
         case _Functions.length:
-          responsePort.send(box.length);
+          model.responsePort.send(box.length);
+          break;
 
         case _Functions.keyAt:
-          final index = data['index']! as int;
+          final index = data as int;
           try {
             final key = box.keyAt(index);
-            responsePort.send(key);
+            model.responsePort.send(key);
           } catch (e) {
-            responsePort.send(null);
+            model.responsePort.send(null);
           }
+          break;
 
         case _Functions.containsKey:
-          final key = data['key'];
+          final key = data;
           final contains = box.containsKey(key);
-          responsePort.send(contains);
+          model.responsePort.send(contains);
+          break;
 
         case _Functions.put:
-          final key = data['key']! as String;
-          final value = data['value']! as Uint8List;
-          await box.put(key, value);
-          responsePort.send(true);
+          final entry = data as MapEntry<dynamic, Uint8List>;
+          await box.put(entry.key, entry.value);
+          model.responsePort.send(true);
+          break;
 
         case _Functions.putAt:
-          final key = data['index']! as int;
-          final value = data['value']! as Uint8List;
-          await box.putAt(key, value);
-          responsePort.send(true);
+          final entry = data as MapEntry<int, Uint8List>;
+          await box.putAt(entry.key, entry.value);
+          model.responsePort.send(true);
+          break;
 
         case _Functions.putAll:
-          final values = data['entries']! as Map<String, Uint8List>;
+          final values = data as Map<dynamic, Uint8List>;
           await box.putAll(values);
-          responsePort.send(true);
+          model.responsePort.send(true);
+          break;
 
         case _Functions.add:
-          final input = data['value']! as Uint8List;
+          final input = data as Uint8List;
           final key = await box.add(input);
-          responsePort.send(key);
+          model.responsePort.send(key);
+          break;
 
         case _Functions.addAll:
-          final input = data['values']! as List<Uint8List>;
+          final input = data.cast<Uint8List>();
           final keys = await box.addAll(input);
-          responsePort.send(keys.toList());
+          model.responsePort.send(keys.toList());
+          break;
 
         case _Functions.delete:
-          final key = data['key']! as String;
+          final key = data;
           await box.delete(key);
-          responsePort.send(true);
+          model.responsePort.send(true);
+          break;
 
         case _Functions.deleteAt:
-          final index = data['index']! as int;
+          final index = data as int;
           await box.deleteAt(index);
-          responsePort.send(true);
+          model.responsePort.send(true);
+          break;
 
         case _Functions.deleteAll:
-          final keys = data['keys']! as Iterable<dynamic>;
+          final keys = data as Iterable<dynamic>;
           await box.deleteAll(keys);
-          responsePort.send(true);
+          model.responsePort.send(true);
+          break;
 
         case _Functions.get:
-          final key = data['key']! as String;
+          final key = data;
           final result = box.get(key);
-          responsePort.send(result);
+          model.responsePort.send(result);
+          break;
 
         case _Functions.getAt:
-          final index = data['index']! as int;
+          final index = data as int;
           final result = box.getAt(index);
-          responsePort.send(result);
+          model.responsePort.send(result);
+          break;
 
         case _Functions.getAll:
           final values = box.values.toList();
-          responsePort.send(values);
+          model.responsePort.send(values);
+          break;
 
         case _Functions.clear:
           await box.clear();
-          responsePort.send(true);
-
-        case _Functions.deleteFromDisk:
-          await box.deleteFromDisk();
-          responsePort.send(true);
+          model.responsePort.send(true);
+          break;
 
         case _Functions.flush:
           await box.flush();
-          responsePort.send(true);
+          model.responsePort.send(true);
+          break;
 
         case _Functions.dispose:
+          for (final subscription in subscriptions.entries) {
+            await subscription.value.cancel();
+            subscriptions.remove(subscription.key);
+          }
           await box.close();
-          responsePort.send(true);
+          model.responsePort.send(true);
           receivePort.close();
+          break;
+
+        case _Functions.deleteFromDisk:
+          for (final subscription in subscriptions.entries) {
+            await subscription.value.cancel();
+            subscriptions.remove(subscription.key);
+          }
+          await box.deleteFromDisk();
+          model.responsePort.send(true);
+          receivePort.close();
+          break;
+
+        case _Functions.watch:
+          final key = data;
+          final subscription = box
+              .watch(key: key)
+              .listen((event) => model.responsePort.send(event));
+
+          subscriptions[model.responsePort] = subscription;
+          break;
+
+        case _Functions.unwatch:
+          final subscription = subscriptions.remove(model.responsePort);
+          await subscription?.cancel();
+          break;
 
         default:
           throw UnsupportedError("Unsupported action: ${data['action']}");
       }
     } catch (e) {
-      responsePort.send('e: $e');
+      model.responsePort.send('e: $e');
     }
   }
 }
 
 class _Functions {
-  static const preOpen = 'preOpen';
+  static const ping = 'ping';
   static const name = 'name';
   static const isOpen = 'isOpen';
   static const path = 'path';
@@ -165,30 +230,6 @@ class _Functions {
   static const deleteFromDisk = 'deleteFromDisk';
   static const flush = 'flush';
   static const dispose = 'dispose';
-
-  List<String> get values => [
-        preOpen,
-        name,
-        isOpen,
-        path,
-        length,
-        keys,
-        keyAt,
-        containsKey,
-        put,
-        putAt,
-        putAll,
-        add,
-        addAll,
-        delete,
-        deleteAt,
-        deleteAll,
-        get,
-        getAt,
-        getAll,
-        clear,
-        deleteFromDisk,
-        flush,
-        dispose,
-      ];
+  static const watch = 'watch';
+  static const unwatch = 'unwatch';
 }

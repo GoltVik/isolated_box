@@ -1,21 +1,13 @@
-class TestModel {
-  final String id;
-  final DateTime updatedAt;
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  TestModel({
-    required this.id,
-    required this.updatedAt,
-  });
+part 'test_model.freezed.dart';
 
-  TestModel copyWith({
-    String? id,
-    DateTime? updatedAt,
-  }) {
-    return TestModel(
-      id: id ?? this.id,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
+@freezed
+class TestModel with _$TestModel {
+  factory TestModel({
+    required String id,
+    required DateTime updatedAt,
+  }) = _TestModel;
 
   static TestModel fromJson(Map<String, dynamic> json) {
     return TestModel(
@@ -30,14 +22,4 @@ class TestModel {
       'updatedAt': model.updatedAt.toIso8601String(),
     };
   }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-
-    return other is TestModel && other.id == id && other.updatedAt == updatedAt;
-  }
-
-  @override
-  int get hashCode => id.hashCode ^ updatedAt.hashCode;
 }

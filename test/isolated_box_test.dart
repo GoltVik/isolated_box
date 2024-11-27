@@ -1,20 +1,23 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:isolated_box/isolated_box.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'test_model.dart';
 
 void main() {
+  const boxName = 'files';
   IsolatedBox<TestModel>? isolatedBox;
 
-  TestModel mockModel() => TestModel(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+  TestModel mockModel([int? index]) => TestModel(
+        id: index?.toString() ??
+            DateTime.now().microsecondsSinceEpoch.toString(),
         updatedAt: DateTime.now(),
       );
 
-  setUpAll(() async {
+  Future<void> initBox() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     WidgetsFlutterBinding.ensureInitialized();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -23,15 +26,15 @@ void main() {
       (MethodCall methodCall) async => '.',
     );
 
-    final appDir = await getApplicationDocumentsDirectory();
     isolatedBox = await IsolatedBox.init<TestModel>(
-      dirPath: appDir.path,
-      boxName: 'files',
+      boxName: boxName,
       fromJson: TestModel.fromJson,
       toJson: TestModel.toJsonString,
     );
     await isolatedBox?.clear();
-  });
+  }
+
+  setUpAll(() async => await initBox());
 
   tearDown(() async {
     try {
@@ -39,7 +42,11 @@ void main() {
     } catch (_) {}
   });
 
-  tearDownAll(() async => await isolatedBox?.dispose());
+  tearDownAll(() async {
+    try {
+      await isolatedBox?.dispose();
+    } catch (_) {}
+  });
 
   test('name', () async {
     final name = await isolatedBox?.name;
@@ -56,7 +63,7 @@ void main() {
     var count = await isolatedBox?.length;
     expect(count, 0);
 
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     await isolatedBox?.addAll(items);
 
     count = await isolatedBox?.length;
@@ -92,7 +99,7 @@ void main() {
     final key = await isolatedBox?.keyAt(0);
     expect(key, isNull);
 
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     final ids = items.map((e) => e.id);
     await isolatedBox?.putAll({for (var e in items) e.id: e});
 
@@ -136,7 +143,7 @@ void main() {
     var keys = await isolatedBox?.keys;
     expect(keys?.length, 0);
 
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     final ids = items.map((e) => e.id);
     await isolatedBox?.putAll({for (var e in items) e.id: e});
 
@@ -165,7 +172,7 @@ void main() {
   });
 
   test('addAll', () async {
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     final ids = await isolatedBox?.addAll(items);
 
     expect(ids, isA<List<int>>());
@@ -214,7 +221,7 @@ void main() {
   });
 
   test('putAll', () async {
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     await isolatedBox?.putAll({for (var e in items) e.id: e});
 
     final materialFromBox = await isolatedBox?.getAll();
@@ -265,7 +272,7 @@ void main() {
   });
 
   test('getAll when prefilled', () async {
-    final items = List.generate(3, (index) => mockModel());
+    final items = List.generate(3, mockModel);
     await isolatedBox?.addAll(items);
 
     final result = await isolatedBox?.getAll();
@@ -348,7 +355,7 @@ void main() {
   });
 
   test('deleteAll when keys are existing in db', () async {
-    final data = List.generate(3, (index) => mockModel());
+    final data = List.generate(3, mockModel);
     final ids = data.map((e) => e.id);
     await isolatedBox?.putAll({for (final e in data) e.id: e});
 
@@ -374,7 +381,7 @@ void main() {
   });
 
   test('clear when is not empty', () async {
-    final data = List.generate(3, (index) => mockModel());
+    final data = List.generate(3, mockModel);
     final newIds = await isolatedBox?.addAll(data);
     expect(newIds?.length, data.length);
 
@@ -403,32 +410,18 @@ void main() {
     }
   });
 
-  // // 10   100   1000   10000   100000
-  // // 3,5  5,10  13,52  30,199  197,1150
-  // test('benchmark', () async {
-  // Future<void> measureExecutionTime(Future? functionToExecute) async {
-  //   final startTime = DateTime.now(); // Record start time
-  //   await functionToExecute; // Execute the function
-  //   final endTime = DateTime.now(); // Record end time
-  //
-  //   final executionTime = endTime.difference(startTime);
-  //   print('Execution time: ${executionTime.inMilliseconds} ms');
-  // }
-  //
-  //   const count = 10;
-  //   final items = List.generate(count, (index) => mockMaterial());
-  //
-  //   await measureExecutionTime(isolatedBox?.addAll(items));
-  //
-  //   await measureExecutionTime(isolatedBox?.getAll());
-  //   final materialFromBox = await isolatedBox?.getAll();
-  //
-  //   expect(materialFromBox, isA<List<BaseModel>>());
-  //   expect(materialFromBox, isNotEmpty);
-  //   expect(materialFromBox?.length, count);
-  //
-  //   expect(materialFromBox?[0].id, items[0].id);
-  //   expect(materialFromBox?[1].id, items[1].id);
-  //   expect(materialFromBox?[2].id, items[2].id);
-  // });
+  test('deleteBox', () async {
+    await initBox();
+
+    final path = await isolatedBox?.path;
+    await isolatedBox?.deleteFromDisk();
+    final exists = File(path!).existsSync();
+    expect(exists, false);
+
+    try {
+      await isolatedBox?.getAll();
+    } catch (e) {
+      expect(e, isA<AssertionError>());
+    }
+  });
 }
