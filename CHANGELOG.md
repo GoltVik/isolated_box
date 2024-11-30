@@ -17,3 +17,7 @@
 ## 1.0.0
 
 * Stable release with cross-isolate support.
+
+## 1.0.1
+
+* Fixed migration procedure.
