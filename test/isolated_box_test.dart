@@ -8,6 +8,7 @@ import 'package:isolated_box/isolated_box.dart';
 import 'test_model.dart';
 
 void main() {
+  const boxName = 'files';
   IsolatedBox<TestModel>? isolatedBox;
 
   TestModel mockModel([int? index]) => TestModel(
@@ -26,7 +27,7 @@ void main() {
     );
 
     isolatedBox = await IsolatedBox.init<TestModel>(
-      boxName: 'files',
+      boxName: boxName,
       fromJson: TestModel.fromJson,
       toJson: TestModel.toJsonString,
     );
@@ -423,33 +424,4 @@ void main() {
       expect(e, isA<AssertionError>());
     }
   });
-
-  // // 10   100   1000   10000   100000
-  // // 3,5  5,10  13,52  30,199  197,1150
-  // test('benchmark', () async {
-  // Future<void> measureExecutionTime(Future? functionToExecute) async {
-  //   final startTime = DateTime.now(); // Record start time
-  //   await functionToExecute; // Execute the function
-  //   final endTime = DateTime.now(); // Record end time
-  //
-  //   final executionTime = endTime.difference(startTime);
-  //   print('Execution time: ${executionTime.inMilliseconds} ms');
-  // }
-  //
-  //   const count = 10;
-  //   final items = List.generate(count, (index) => mockMaterial());
-  //
-  //   await measureExecutionTime(isolatedBox?.addAll(items));
-  //
-  //   await measureExecutionTime(isolatedBox?.getAll());
-  //   final materialFromBox = await isolatedBox?.getAll();
-  //
-  //   expect(materialFromBox, isA<List<BaseModel>>());
-  //   expect(materialFromBox, isNotEmpty);
-  //   expect(materialFromBox?.length, count);
-  //
-  //   expect(materialFromBox?[0].id, items[0].id);
-  //   expect(materialFromBox?[1].id, items[1].id);
-  //   expect(materialFromBox?[2].id, items[2].id);
-  // });
 }

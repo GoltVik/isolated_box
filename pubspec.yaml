@@ -1,11 +1,10 @@
 name: isolated_box
 description: "Isolated Box for Hive project."
-version: 0.0.2
-publish_to: 'none'
-repository: https://github.com/GoltVik/isolated_box.git
+version: 1.0.1
+repository: https://github.com/GoltVik/isolated_box
 
 environment:
-  sdk: ^3.5.3
+  sdk: ^3.5.4
 
 dependencies:
   flutter:
@@ -18,6 +17,12 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
+  flutter_lints: ^5.0.0
+  very_good_analysis: ^6.0.0
+  build_runner:
+  hive_generator: ^2.0.1
+  freezed: ^2.5.7
+  json_serializable: ^6.9.0
 
 flutter:
   uses-material-design: true

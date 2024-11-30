@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:isolated_box/isolated_box.dart';
 
 void main() {
+  const boxName = 'strings';
   IsolatedBox<String>? isolatedBox;
 
   String mockModel([int? index]) => (index ?? 0).toString();
@@ -19,7 +20,7 @@ void main() {
       (MethodCall methodCall) async => '.',
     );
 
-    isolatedBox = await IsolatedBox.init<String>(boxName: 'strings');
+    isolatedBox = await IsolatedBox.init<String>(boxName: boxName);
     await isolatedBox?.clear();
   }
 
