@@ -12,26 +12,24 @@ class _IsolatedBoxMigration<T> {
   });
 
   Future<Map<dynamic, T>> migrate() async {
-    Hive.init(path);
-    final box = await Hive.openBox<T>(boxName);
     final migrationObjects = <dynamic, T>{};
 
-    switch (policy) {
-      case MigrationStrategy.deleteAndCreate:
-        await box.clear();
+    if (policy.shouldMigrate) {
+      policy.initAdapters?.call();
+      final box = await Hive.openBox<T>(boxName, path: path);
 
-      case MigrationStrategy.migrate:
-        for (var i = 0; i < box.length; i++) {
-          final key = box.keyAt(i);
-          final value = box.getAt(i);
-          if (key != null && value != null) {
-            migrationObjects[key] = value;
-          }
+      for (var i = 0; i < box.length; i++) {
+        final key = box.keyAt(i);
+        final value = box.getAt(i);
+        if (key != null && value != null) {
+          migrationObjects[key] = value;
         }
+      }
+
+      await box.close();
     }
 
-    await box.close();
-    await Hive.deleteBoxFromDisk(boxName);
+    await Hive.deleteBoxFromDisk(boxName, path: path);
     return migrationObjects;
   }
 }
