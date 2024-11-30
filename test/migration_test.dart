@@ -60,7 +60,11 @@ void main() {
   test('migration test with migrate policy', () async {
     final isolatedBox = await IsolatedBox.init<TestModelHive>(
       boxName: boxName,
-      migrationStrategy: MigrationStrategy.migrate,
+      migrationStrategy: MigrationStrategy.migrate(() {
+        if (!Hive.isAdapterRegistered(1)) {
+          Hive.registerAdapter(TestModelHiveImplAdapter());
+        }
+      }),
       fromJson: TestModelHive.fromJson,
       toJson: TestModelHive.toJsonString,
     );
