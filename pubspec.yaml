@@ -1,6 +1,6 @@
 name: isolated_box
 description: "A Dart package providing an isolated box for the Hive database, enabling cross-isolate usage."
-version: 1.0.1
+version: 1.0.2
 repository: https://github.com/GoltVik/isolated_box
 
 environment:
