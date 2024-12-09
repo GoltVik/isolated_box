@@ -21,3 +21,7 @@
 ## 1.0.1
 
 * Fixed migration procedure.
+
+## 1.0.2
+
+* Fixed isolate sharing.

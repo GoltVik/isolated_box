@@ -9,11 +9,6 @@ import 'test_model_hive.dart';
 
 void main() {
   const boxName = 'models';
-  TestModelHive mockModel([int? index]) => TestModelHive(
-        id: index?.toString() ??
-            DateTime.now().microsecondsSinceEpoch.toString(),
-        updatedAt: DateTime.now(),
-      );
 
   Future<void> preInit() async {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -38,7 +33,7 @@ void main() {
           toJson: TestModelHive.toJsonString,
         );
 
-        final items = List.generate(count, (index) => mockModel(index));
+        final items = TestModelHive.mockList(count);
 
         await isolatedBox.addAll(items).measure('addAll');
         final materialFromBox = await isolatedBox.getAll().measure('getAll');
@@ -52,7 +47,7 @@ void main() {
         expect(materialFromBox[2].id, items[2].id);
 
         await isolatedBox.clear();
-        await isolatedBox.dispose();
+        await isolatedBox.deleteFromDisk();
         debugPrint('------------------------------------');
       });
     }
@@ -68,7 +63,7 @@ void main() {
         }
 
         final box = (await Hive.openBox<TestModelHive>(boxName));
-        final items = List.generate(count, (index) => mockModel(index));
+        final items = TestModelHive.mockList(count);
 
         await box.addAll(items).measure('addAll');
         final materialFromBox =

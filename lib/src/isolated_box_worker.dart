@@ -14,8 +14,23 @@ class _ActionModel {
   //data as Uint8List
   //data as List<Uint8List>
   //data as Iterable<dynamic> (keys)
+  //data as List<int>
 
   _ActionModel(this.action, this.data, this.responsePort);
+
+  factory _ActionModel.fromJson(Map<String, dynamic> json) {
+    return _ActionModel(
+      json['action'] as String,
+      json['data'],
+      json['responsePort'] as SendPort,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'action': action,
+        'data': data,
+        'responsePort': responsePort,
+      };
 }
 
 Future<void> _collectionIsolate<T>(List<dynamic> args) async {
@@ -23,11 +38,11 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
   final boxName = args[1] as String;
   final dirPath = args[2] as String;
 
-  final Box<Uint8List> box;
+  final Box<List<int>> box;
   try {
     /// Initialize Hive with dirPath
     Hive.init(dirPath);
-    box = await Hive.openBox<Uint8List>(boxName);
+    box = await Hive.openBox<List<int>>(boxName);
   } catch (e) {
     mainSendPort.send('e: $e');
     return;
@@ -38,7 +53,11 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
 
   final Map<SendPort, StreamSubscription<BoxEvent>> subscriptions = {};
 
-  await for (final model in receivePort) {
+  await for (dynamic model in receivePort) {
+    if (model is Map<String, dynamic>) {
+      model = _ActionModel.fromJson(model);
+    }
+
     if (model is! _ActionModel) {
       throw ArgumentError('Invalid model type: ${model.runtimeType}');
     }
@@ -48,7 +67,7 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
     try {
       switch (model.action) {
         case _Functions.ping:
-          model.responsePort.send('pong');
+          model.responsePort.send(receivePort.sendPort);
           break;
 
         case _Functions.name:
@@ -89,19 +108,19 @@ Future<void> _collectionIsolate<T>(List<dynamic> args) async {
           break;
 
         case _Functions.put:
-          final entry = data as MapEntry<dynamic, Uint8List>;
-          await box.put(entry.key, entry.value);
+          final entry = data as Set;
+          await box.put(entry.first, Uint8List.fromList(entry.last));
           model.responsePort.send(true);
           break;
 
         case _Functions.putAt:
-          final entry = data as MapEntry<int, Uint8List>;
-          await box.putAt(entry.key, entry.value);
+          final entry = data as Set;
+          await box.putAt(entry.first, Uint8List.fromList(entry.last));
           model.responsePort.send(true);
           break;
 
         case _Functions.putAll:
-          final values = data as Map<dynamic, Uint8List>;
+          final values = data as Map<dynamic, List<int>>;
           await box.putAll(values);
           model.responsePort.send(true);
           break;

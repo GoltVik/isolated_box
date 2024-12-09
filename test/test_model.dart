@@ -22,4 +22,14 @@ class TestModel with _$TestModel {
       'updatedAt': model.updatedAt.toIso8601String(),
     };
   }
+
+  static TestModel mock([int? index]) => TestModel(
+    id: index?.toString() ??
+        DateTime.now().microsecondsSinceEpoch.toString(),
+    updatedAt: DateTime.now(),
+  );
+
+  static List<TestModel> mockList(int count) {
+    return List.generate(count, (i) => mock(i));
+  }
 }

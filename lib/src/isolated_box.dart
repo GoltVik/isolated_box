@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
+import 'dart:typed_data';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
+// import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -126,23 +127,25 @@ class IsolatedBox<T> {
 
     try {
       final response = ReceivePort();
-      sendPort.send(_ActionModel(_Functions.ping, null, response.sendPort));
-      await response.first.timeout(const Duration(milliseconds: 300));
+      sendPort.send(
+        _ActionModel(_Functions.ping, null, response.sendPort).toJson(),
+      );
+      await response.first.timeout(const Duration(seconds: 1));
       response.close();
       return true;
-    } catch (_) {
+    } catch (e) {
       IsolateNameServer.removePortNameMapping(_boxName);
       return false;
     }
   }
 
-  Uint8List _objectToBytes(T object) {
+  List<int> _objectToBytes(T object) {
     final mapObject = _toJson?.call(object) ?? object;
     final jsonString = jsonEncode(mapObject);
-    return Uint8List.fromList(utf8.encode(jsonString));
+    return utf8.encode(jsonString);
   }
 
-  T _objectFromBytes(Uint8List bytes) {
+  T _objectFromBytes(List<int> bytes) {
     final jsonString = utf8.decode(bytes);
     final mapObject = jsonDecode(jsonString);
     return _fromJson?.call(mapObject) ?? mapObject as T;
@@ -151,13 +154,13 @@ class IsolatedBox<T> {
   Future<E> _makeIsolateCall<E>(String action, [dynamic input]) async {
     dynamic formatInput({dynamic input, required String action}) {
       if (input is MapEntry<int, T>) {
-        return MapEntry(input.key, _objectToBytes(input.value));
+        return {input.key, _objectToBytes(input.value)};
       }
       if (input is MapEntry<String, T>) {
-        return MapEntry(input.key, _objectToBytes(input.value));
+        return {input.key, _objectToBytes(input.value)};
       }
       if (input is MapEntry<dynamic, T>) {
-        return MapEntry(input.key, _objectToBytes(input.value));
+        return {input.key, _objectToBytes(input.value)};
       }
       if (input is Iterable<T> || input is List<T>) {
         return input.map(_objectToBytes).toList();
@@ -172,11 +175,13 @@ class IsolatedBox<T> {
     }
 
     E formatOutput(dynamic output) {
-      if (output is List<Uint8List>) {
+      if (output is List<List<int>>) {
         return output.map(_objectFromBytes).toList() as E;
       }
 
-      if (output is Uint8List) return _objectFromBytes(output) as E;
+      if (output is List<int> && action != _Functions.addAll) {
+        return _objectFromBytes(output) as E;
+      }
 
       return output;
     }
@@ -185,7 +190,7 @@ class IsolatedBox<T> {
 
     final response = ReceivePort();
     _sendPort!.send(
-      _ActionModel(action, formatedInput, response.sendPort),
+      _ActionModel(action, formatedInput, response.sendPort).toJson(),
     );
 
     final result = await response.first;

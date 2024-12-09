@@ -18,7 +18,7 @@ Add the following dependencies to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  isolated_box: ^1.0.0
+  isolated_box: ^1.0.2
 ```
 
 Run flutter pub get to install the dependencies.
