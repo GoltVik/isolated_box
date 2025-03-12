@@ -1,16 +1,14 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 part 'test_model_hive.freezed.dart';
 
-part 'test_model_hive.g.dart';
 
 @freezed
-class TestModelHive extends HiveObject with _$TestModelHive {
-  @HiveType(typeId: 1)
+abstract class TestModelHive extends HiveObject with _$TestModelHive {
   factory TestModelHive({
-    @HiveField(0) required String id,
-    @HiveField(1) required DateTime updatedAt,
+    required String id,
+    required DateTime updatedAt,
   }) = _TestModelHive;
 
   TestModelHive._();

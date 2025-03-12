@@ -1,10 +1,11 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 import 'package:isolated_box/isolated_box.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'test_model_adapters.dart';
 import 'test_model_hive.dart';
 
 void main() {
@@ -58,8 +59,8 @@ void main() {
       test('benchmark for $count', () async {
         final path = (await getApplicationDocumentsDirectory()).path;
         Hive.init(path);
-        if (!Hive.isAdapterRegistered(1)) {
-          Hive.registerAdapter(TestModelHiveImplAdapter());
+        if (!Hive.isAdapterRegistered(TestModelHiveAdapter().typeId)) {
+          Hive.registerAdapters();
         }
 
         final box = (await Hive.openBox<TestModelHive>(boxName));
