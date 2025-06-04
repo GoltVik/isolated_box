@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 // import 'package:flutter/foundation.dart';
-import 'package:hive_ce/hive.dart';
+import 'package:hive_ce/hive.dart' hide IsolateNameServer;
 import 'package:path_provider/path_provider.dart';
 
 import 'migration_strategy.dart';

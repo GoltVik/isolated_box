@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive_ce/hive.dart';
+import 'package:hive_ce/hive.dart' as hive;
 import 'package:isolated_box/isolated_box.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -32,11 +32,11 @@ void main() {
   }
 
   setUp(() async {
-    Hive.init(await getPath());
-    if (!Hive.isAdapterRegistered(TestModelHiveAdapter().typeId)) {
-      Hive.registerAdapters();
+    hive.Hive.init(await getPath());
+    if (!hive.Hive.isAdapterRegistered(TestModelHiveAdapter().typeId)) {
+      hive.Hive.registerAdapters();
     }
-    final box = await Hive.openBox<TestModelHive>(boxName);
+    final box = await hive.Hive.openBox<TestModelHive>(boxName);
     if (box.isEmpty) {
       final items = List.generate(3, mockModel);
       await box.addAll(items);
@@ -62,8 +62,8 @@ void main() {
     final isolatedBox = await IsolatedBox.init<TestModelHive>(
       boxName: boxName,
       migrationStrategy: MigrationStrategy.migrate(() {
-        if (!Hive.isAdapterRegistered(TestModelHiveAdapter().typeId)) {
-          Hive.registerAdapters();
+        if (!hive.Hive.isAdapterRegistered(TestModelHiveAdapter().typeId)) {
+          hive.Hive.registerAdapters();
         }
       }),
       fromJson: TestModelHive.fromJson,
